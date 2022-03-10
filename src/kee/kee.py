@@ -1,15 +1,24 @@
-#!/usr/bin/env python3
 """
 kee
 
-ASCII (ASS-kee) art generator
+Create ASCII (ass-kee) art as a pdf and print it!
+
+Copyright (C) 2022 Luiz Eduardo Amaral <luizamaral306@gmail.com>
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import argparse
 import math
 from os import path
 import re
 from subprocess import run
-import sys
 import tempfile
 from xml.etree import ElementTree as ET
 
@@ -224,177 +233,20 @@ def main(
     tree = ET.ElementTree(svg)
     tree.write(svg_output, encoding="utf-8", xml_declaration=True)
     run(
-        [
-            "inkscape",
-            "-o",
-            output,
-            svg_output,
-        ]
         # [
-        #     "convert",
-        #     "-density",
-        #     "300",
-        #     "-page",
-        #     paper_size,
-        #     svg_output,
+        #     "inkscape",
+        #     "-o",
         #     output,
+        #     svg_output,
         # ]
+        [
+            "convert",
+            "-density",
+            "300",
+            "-units",
+            "PixelsPerInch",
+            svg_output,
+            output,
+        ]
     )
     # cairosvg.svg2pdf(url=svg_output, write_to=output)
-
-
-def hex_string(value):
-    if not re.match("^#([0-9a-fA-F]{3}){1,2}", value):
-        raise argparse.ArgumentTypeError("Not an hex string")
-    return value
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Creates a pdf document with given picture as ASCII art."
-    )
-    parser.add_argument("image", help="source image file")
-    parser.add_argument(
-        "-w", "--width", type=int, default=480, help="Number of characters per row"
-    )
-    parser.add_argument(
-        "-p", "--palette", type=str, default="@%#*+=-:. ", help="Character palette"
-    )
-    parser.add_argument(
-        "-i",
-        "--invert-palette",
-        action="store_true",
-        help="Inverts the color palette",
-    )
-    parser.add_argument(
-        "-f",
-        "--font-size",
-        type=float,
-        default=12,
-        help="Font size",
-    )
-    parser.add_argument(
-        "-K",
-        "--black-threshold",
-        type=float,
-        default=0,
-        help="Image threshold for black",
-    )
-    parser.add_argument(
-        "-W",
-        "--white-threshold",
-        type=float,
-        default=1,
-        help="Image threshold for white",
-    )
-    parser.add_argument(
-        "-c",
-        "--character-ratio",
-        type=float,
-        default=2.0,
-        help="Character height to width ratio",
-    )
-    parser.add_argument(
-        "-F",
-        "--foreground-color",
-        type=hex_string,
-        default="#111",
-        help="Foreground color",
-    )
-    parser.add_argument(
-        "-B",
-        "--background-color",
-        type=hex_string,
-        default="#fff",
-        help="Background color",
-    )
-    parser.add_argument(
-        "-G",
-        "--highlight-color",
-        type=hex_string,
-        default=["#e11"],
-        nargs="+",
-        help="Highlight colors",
-    )
-    parser.add_argument(
-        "-g",
-        "--highlight",
-        type=str,
-        default=[],
-        nargs="*",
-        help="Highlight words",
-    )
-    parser.add_argument(
-        "--background-text",
-        type=str,
-        default=None,
-        help="Background text",
-    )
-    parser.add_argument(
-        "--background-text-size",
-        type=float,
-        default=244,
-        help="Background text font size",
-    )
-    parser.add_argument(
-        "--background-text-color",
-        type=hex_string,
-        default="#BBB",
-        help="Background text color",
-    )
-    parser.add_argument(
-        "-H",
-        "--write-header",
-        action="store_true",
-        help="Writes header in the document",
-    )
-    parser.add_argument(
-        "-P",
-        "--paper-size",
-        choices=PAPER_SIZES.keys(),
-        default="A3",
-        help="Print paper size",
-    )
-    parser.add_argument(
-        "-s",
-        "--svg-output",
-        default=None,  # Goes to /tmp
-        type=str,
-        help="Svg output file",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        default=None,  # Same name as image
-        type=str,
-        help="Pdf output file",
-    )
-    parser.add_argument(
-        "-v", "--version", action="version", version=f"%(prog)s {__version__}"
-    )
-    args = parser.parse_args()
-    command_str = " ".join([a if a.startswith("-") else f'"{a}"' for a in sys.argv[1:]])
-    header_text = (
-        None if not args.write_header else f"kee v{__version__}\nkee.py {command_str}"
-    )
-    main(
-        args.image,
-        args.width,
-        args.palette,
-        args.invert_palette,
-        args.font_size,
-        args.black_threshold,
-        args.white_threshold,
-        args.character_ratio,
-        args.foreground_color,
-        args.background_color,
-        args.highlight_color,
-        args.highlight,
-        args.background_text,
-        args.background_text_size,
-        args.background_text_color,
-        header_text,
-        args.paper_size,
-        args.svg_output,
-        args.output,
-    )
