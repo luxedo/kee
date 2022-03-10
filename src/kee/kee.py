@@ -16,15 +16,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import math
-from os import path
 import re
-from subprocess import run
 import tempfile
+from os import path
+from subprocess import run
 from xml.etree import ElementTree as ET
 
 # import cairosvg
 import numpy as np
-from skimage import io, transform, color, exposure, data, filters
+from skimage import color, exposure, io, transform
 
 PAPER_SIZES = {
     "A0": (841, 1189),
@@ -130,8 +130,8 @@ def main(
             "xmlns:svg": "http://www.w3.org/2000/svg",
         },
     )
-    defs = ET.SubElement(svg, "defs")
-    style = ET.SubElement(defs, "style", type="text/css")
+    # defs = ET.SubElement(svg, "defs")
+    # style = ET.SubElement(defs, "style", type="text/css")
     # with open("stylesheet.css", "r") as fp:
     #     style.text = f"\n{fp.read()}\n"
     g = ET.Element("g")
@@ -157,8 +157,8 @@ def main(
         text = ET.Element(
             "text",
             **{
-                "x": f"0",
-                "y": f"0",
+                "x": "0",
+                "y": "0",
                 "xml:space": "preserve",
                 "fill": background_text_color,
                 "style": f"font-size: {background_text_size};font-family: Courier;font-weight: bold;font-kerning: none;letter-spacing: -0.05em;",
@@ -182,15 +182,15 @@ def main(
             text.append(tspan)
         g.append(text)
 
-    for layer, color in zip(text_layers, color_layers):
+    for layer, color_ in zip(text_layers, color_layers):
         text = ET.Element(
             "text",
             **{
-                "x": f"50%",
-                "y": f"50%",
+                "x": "50%",
+                "y": "50%",
                 "text-anchor": "middle",
                 "xml:space": "preserve",
-                "fill": color,
+                "fill": color_,
                 "transform": f"translate(0, {height/2})",
                 "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;letter-spacing: -0.05em;",
             },
@@ -223,7 +223,7 @@ def main(
                 "tspan",
                 **{
                     "x": f"{header_font_size}",
-                    "dy": f"1em",
+                    "dy": "1em",
                 },
             )
             tspan.text = line
