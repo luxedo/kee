@@ -2,6 +2,8 @@
 
 > Create ASCII (ass-kee) art as a pdf and print it!
 
+<img src="examples/dst/ada.jpg" width=200 />
+
 # Install
 
 `kee` uses [ImageMagick](https://imagemagick.org/index.php) to create

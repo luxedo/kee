@@ -22,10 +22,10 @@ from os import path
 from subprocess import run
 from xml.etree import ElementTree as ET
 
-# import cairosvg
 import numpy as np
 from skimage import color, exposure, io, transform
 
+__version__ = "1.0.0"
 PAPER_SIZES = {
     "A0": (841, 1189),
     "A1": (594, 841),
@@ -41,7 +41,6 @@ PAPER_SIZES = {
     "B5": (176, 250),
 }
 DPI = 300
-__version__ = "1.0.0"
 
 
 def mm2in(mm):
@@ -56,7 +55,7 @@ def build_ascii_art(
     image_name, width, palette, character_ratio, black_threshold, white_threshold
 ):
     img = io.imread(image_name)
-    height = round(width / img.shape[0] * img.shape[1] / character_ratio)
+    height = round(width / img.shape[1] * img.shape[0] / character_ratio)
     img = transform.resize(img, (height, width))
     img = color.rgb2gray(img)
     img = np.clip(img, black_threshold, white_threshold)
@@ -233,20 +232,13 @@ def main(
     tree = ET.ElementTree(svg)
     tree.write(svg_output, encoding="utf-8", xml_declaration=True)
     run(
-        # [
-        #     "inkscape",
-        #     "-o",
-        #     output,
-        #     svg_output,
-        # ]
         [
             "convert",
             "-density",
-            "300",
+            f"{DPI}",
             "-units",
             "PixelsPerInch",
             svg_output,
             output,
         ]
     )
-    # cairosvg.svg2pdf(url=svg_output, write_to=output)
