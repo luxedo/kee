@@ -104,24 +104,24 @@ if __name__ == "__main__":
         nargs="*",
         help="Highlight words",
     )
-    parser.add_argument(
-        "--background-text",
-        type=str,
-        default=None,
-        help="Background text",
-    )
-    parser.add_argument(
-        "--background-text-size",
-        type=float,
-        default=244,
-        help="Background text font size",
-    )
-    parser.add_argument(
-        "--background-text-color",
-        type=hex_string,
-        default="#BBB",
-        help="Background text color",
-    )
+    # parser.add_argument(
+    #     "--background-text",
+    #     type=str,
+    #     default=None,
+    #     help="Background text",
+    # )
+    # parser.add_argument(
+    #     "--background-text-size",
+    #     type=float,
+    #     default=244,
+    #     help="Background text font size",
+    # )
+    # parser.add_argument(
+    #     "--background-text-color",
+    #     type=hex_string,
+    #     default="#BBB",
+    #     help="Background text color",
+    # )
     parser.add_argument(
         "-H",
         "--write-header",
@@ -172,9 +172,9 @@ if __name__ == "__main__":
         args.background_color,
         args.highlight_color,
         args.highlight,
-        args.background_text,
-        args.background_text_size,
-        args.background_text_color,
+        # args.background_text,
+        # args.background_text_size,
+        # args.background_text_color,
         header_text,
         args.paper_size,
         args.svg_output,
