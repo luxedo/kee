@@ -68,7 +68,7 @@ if __name__ == "__main__":
         help="Image threshold for white",
     )
     parser.add_argument(
-        "-c",
+        "-C",
         "--character-ratio",
         type=float,
         default=2.0,
@@ -97,12 +97,29 @@ if __name__ == "__main__":
         help="Highlight colors",
     )
     parser.add_argument(
-        "-g",
-        "--highlight",
+        "-t",
+        "--highlight-text",
         type=str,
         default=[],
         nargs="*",
         help="Highlight words",
+    )
+    parser.add_argument(
+        "--highlight-saturated",
+        action="store_true",
+        help="Highlights saturated areas",
+    )
+    parser.add_argument(
+        "--highlight-saturated-colors",
+        type=int,
+        default=1,
+        help="Number of colors for --highlight-saturated",
+    )
+    parser.add_argument(
+        "--highlight-saturated-brightness",
+        type=float,
+        default=0,
+        help="Offset to increase/decrease brightness of saturated highlights",
     )
     # parser.add_argument(
     #     "--background-text",
@@ -171,7 +188,10 @@ if __name__ == "__main__":
         args.foreground_color,
         args.background_color,
         args.highlight_color,
-        args.highlight,
+        args.highlight_text,
+        args.highlight_saturated,
+        args.highlight_saturated_colors,
+        args.highlight_saturated_brightness,
         # args.background_text,
         # args.background_text_size,
         # args.background_text_color,

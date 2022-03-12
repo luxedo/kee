@@ -24,6 +24,7 @@ from xml.etree import ElementTree as ET
 
 import numpy as np
 from skimage import color, exposure, io, transform
+from sklearn.cluster import KMeans
 
 __version__ = "1.0.0"
 PAPER_SIZES = {
@@ -41,6 +42,7 @@ PAPER_SIZES = {
     "B5": (176, 250),
 }
 DPI = 300
+SATURATION_THRESHOLD = 0.1
 
 
 def mm2in(mm):
@@ -52,11 +54,12 @@ def pixel_to_ascii(pixel, palette):
 
 
 def load_image(image_name, black_threshold, white_threshold):
-    img = io.imread(image_name)
-    img = color.rgb2gray(img)
+    img = io.imread(image_name) / 256
+    # img[np.mean(img, axis=2) < black_threshold] = [0, 0, 0]
+    # img[np.mean(img, axis=2) > white_threshold] = [1, 1, 1]
     img = np.clip(img, black_threshold, white_threshold)
-    img = exposure.equalize_adapthist(img, clip_limit=0.03)
     img = (img - img.min()) / (img.max() - img.min())
+    img = exposure.equalize_adapthist(img, clip_limit=0.03)
     return img
 
 
@@ -71,16 +74,79 @@ def build_ascii_art(
     img = load_image(image_name, black_threshold, white_threshold)
     height = round(width / img.shape[1] * img.shape[0] / character_ratio)
     img = transform.resize(img, (height, width))
-    return "\n".join(
-        ["".join([pixel_to_ascii(cell, palette) for cell in row]) for row in img]
+    return (
+        "\n".join(
+            [
+                "".join([pixel_to_ascii(pixel, palette) for pixel in row])
+                for row in color.rgb2gray(img)
+            ]
+        ),
+        img,
     )
 
 
-def split_layers(ascii_art, highlight):
-    art_split = ascii_art.split("\n")
+def rgb2hex(rgb):
+    return [
+        "#" + "".join([f"{int(c):02x}" for c in (col * 255).round()]) for col in rgb
+    ]
+
+
+def build_palette(color_array, n_colors, value_offset):
+    """
+    Return palette in descending order of frequency
+    """
+    kmeans = KMeans(n_clusters=n_colors)
+    X = color_array.reshape((-1, 3))
+    kmeans.fit(X)
+    colors_ = kmeans.cluster_centers_
+    if value_offset != 0:
+        hsv = color.rgb2hsv(colors_)
+        colors_ = color.hsv2rgb(
+            np.clip(hsv + [0, -value_offset / 2, value_offset], 0, 1)
+        )
+
+    return kmeans, kmeans.cluster_centers_, rgb2hex(colors_)
+
+
+def split_layers(
+    ascii_art,
+    foreground_color,
+    highlight,
+    highlight_color,
+    highlight_saturated,
+    highlight_saturated_colors,
+    highlight_saturated_brightness,
+    img,
+):
+    art_split = [list(row) for row in ascii_art.split("\n")]
     rows = len(art_split)
     columns = len(art_split[0])
     text_layers = []
+    color_layers = []
+
+    # 1. Split saturation highlight from art
+    if highlight_saturated:
+        saturation = color.rgb2hsv(img)[:, :, 1]
+        colors = img[saturation > SATURATION_THRESHOLD]
+        model, centers, colors = build_palette(
+            colors, highlight_saturated_colors, highlight_saturated_brightness
+        )
+        closest = []
+        for center in centers:
+            closest.append(np.linalg.norm(img - center, axis=2))
+        closest = np.array(closest).argmax(axis=0)
+        hs_layers = [
+            [[" " for _ in range(columns)] for _ in range(rows)] for _ in colors
+        ]
+        for i, j in np.argwhere(saturation > SATURATION_THRESHOLD):
+            hs_layers[closest[i][j]][i][j] = art_split[i][j]
+            art_split[i][j] = " "
+        hs_layers = ["\n".join(["".join(row) for row in layer]) for layer in hs_layers]
+        text_layers.extend(hs_layers)
+        color_layers.extend(colors)
+        ascii_art = "\n".join(["".join(row) for row in art_split])
+
+    # 2. Split text highlight from art
     for h in highlight:
         new_layer = "\n".join([" " * columns for _ in range(rows)])
         for i in re.finditer(h, ascii_art):
@@ -88,7 +154,10 @@ def split_layers(ascii_art, highlight):
             new_layer = new_layer[:left] + h + new_layer[right:]
             ascii_art = ascii_art[:left] + " " * len(h) + ascii_art[right:]
         text_layers.append(new_layer)
-    return [ascii_art] + text_layers
+
+    return [ascii_art] + text_layers, [
+        foreground_color
+    ] + color_layers + highlight_color
 
 
 def blank_svg(width_mm, height_mm, width, height, background_color):
@@ -135,7 +204,7 @@ def write_text(g, text_layers, color_layers, center, font_size):
                 "xml:space": "preserve",
                 "fill": color_,
                 "transform": f"translate(0, {center})",
-                "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;letter-spacing: -0.05em;",
+                "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;font-variant-ligatures: none;letter-spacing: -0.05em;",
             },
         )
         layer_split = layer.split("\n")
@@ -223,7 +292,10 @@ def main(
     foreground_color,
     background_color,
     highlight_color,
-    highlight,
+    highlight_text,
+    highlight_saturated,
+    highlight_saturated_colors,
+    highlight_saturated_brightness,
     # background_text,
     # background_text_size,
     # background_text_color,
@@ -246,12 +318,20 @@ def main(
     width_mm, height_mm = PAPER_SIZES[paper_size]
     width, height = (DPI * mm2in(dim) for dim in (width_mm, height_mm))
 
-    ascii_art = build_ascii_art(
+    ascii_art, img = build_ascii_art(
         image_name, columns, palette, black_threshold, white_threshold, character_ratio
     )
 
-    text_layers = split_layers(ascii_art, highlight)
-    color_layers = [foreground_color] + highlight_color
+    text_layers, color_layers = split_layers(
+        ascii_art,
+        foreground_color,
+        highlight_text,
+        highlight_color,
+        highlight_saturated,
+        highlight_saturated_colors,
+        highlight_saturated_brightness,
+        img,
+    )
 
     svg, g = blank_svg(width_mm, height_mm, width, height, background_color)
 
