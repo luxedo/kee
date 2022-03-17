@@ -15,6 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+import colorsys
 import math
 import re
 import tempfile
@@ -42,7 +43,8 @@ PAPER_SIZES = {
     "B5": (176, 250),
 }
 DPI = 300
-SATURATION_THRESHOLD = 0.1
+SATURATION_THRESHOLD = 0.0
+VALUE_THRESHOLD = 0.0
 
 
 def mm2in(mm):
@@ -100,11 +102,23 @@ def build_palette(color_array, n_colors, value_offset):
     kmeans.fit(X)
     colors_ = kmeans.cluster_centers_
     if value_offset != 0:
-        hsv = color.rgb2hsv(colors_)
-        colors_ = color.hsv2rgb(
-            np.clip(hsv + [0, -value_offset / 2, value_offset], 0, 1)
+        hls = [colorsys.rgb_to_hls(*c) for c in colors_]
+        colors_ = np.array(
+            [
+                colorsys.hls_to_rgb(
+                    *np.clip(
+                        [
+                            c[0] + value_offset[0],
+                            c[1] + value_offset[1],
+                            c[2] + value_offset[2],
+                        ],
+                        0,
+                        1,
+                    )
+                )
+                for c in hls
+            ]
         )
-
     return kmeans, kmeans.cluster_centers_, rgb2hex(colors_)
 
 
@@ -113,9 +127,9 @@ def split_layers(
     foreground_color,
     highlight,
     highlight_color,
-    highlight_saturated,
-    highlight_saturated_colors,
-    highlight_saturated_brightness,
+    colors,
+    colors_palette,
+    colors_offset,
     img,
 ):
     art_split = [list(row) for row in ascii_art.split("\n")]
@@ -124,17 +138,25 @@ def split_layers(
     text_layers = []
     color_layers = []
 
-    # 1. Split saturation highlight from art
-    if highlight_saturated:
-        saturation = color.rgb2hsv(img)[:, :, 1]
-        colors = img[saturation > SATURATION_THRESHOLD]
-        model, centers, colors = build_palette(
-            colors, highlight_saturated_colors, highlight_saturated_brightness
-        )
-        closest = []
-        for center in centers:
-            closest.append(np.linalg.norm(img - center, axis=2))
-        closest = np.array(closest).argmax(axis=0)
+    # 1. Split text highlight from art
+    for h, col in zip(highlight, highlight_color):
+        new_layer = "\n".join([" " * columns for _ in range(rows)])
+        for i in re.finditer(h, ascii_art):
+            left, right = i.span()
+            new_layer = new_layer[:left] + h + new_layer[right:]
+            ascii_art = ascii_art[:left] + " " * len(h) + ascii_art[right:]
+        text_layers.append(new_layer)
+        color_layers.append(col)
+
+    art_split = [list(row) for row in ascii_art.split("\n")]
+    # 2. Split saturation highlight from art
+    if colors:
+        _, saturation, value = color.rgb2hsv(img).T
+        saturation, value = saturation.T, value.T
+        colors = img[(saturation > SATURATION_THRESHOLD) & (value > VALUE_THRESHOLD)]
+        model, centers, colors = build_palette(colors, colors_palette, colors_offset)
+        closest = np.linalg.norm([img - center for center in centers], axis=3)
+        closest = closest.argmin(axis=0)
         hs_layers = [
             [[" " for _ in range(columns)] for _ in range(rows)] for _ in colors
         ]
@@ -146,18 +168,9 @@ def split_layers(
         color_layers.extend(colors)
         ascii_art = "\n".join(["".join(row) for row in art_split])
 
-    # 2. Split text highlight from art
-    for h in highlight:
-        new_layer = "\n".join([" " * columns for _ in range(rows)])
-        for i in re.finditer(h, ascii_art):
-            left, right = i.span()
-            new_layer = new_layer[:left] + h + new_layer[right:]
-            ascii_art = ascii_art[:left] + " " * len(h) + ascii_art[right:]
-        text_layers.append(new_layer)
-
-    return [ascii_art] + text_layers, [
-        foreground_color
-    ] + color_layers + highlight_color
+    text_layers.append(ascii_art)
+    color_layers.append(foreground_color)
+    return text_layers, color_layers
 
 
 def blank_svg(width_mm, height_mm, width, height, background_color):
@@ -293,9 +306,9 @@ def main(
     background_color,
     highlight_color,
     highlight_text,
-    highlight_saturated,
-    highlight_saturated_colors,
-    highlight_saturated_brightness,
+    colors,
+    colors_palette,
+    colors_offset,
     # background_text,
     # background_text_size,
     # background_text_color,
@@ -327,9 +340,9 @@ def main(
         foreground_color,
         highlight_text,
         highlight_color,
-        highlight_saturated,
-        highlight_saturated_colors,
-        highlight_saturated_brightness,
+        colors,
+        colors_palette,
+        colors_offset,
         img,
     )
 

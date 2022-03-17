@@ -105,21 +105,23 @@ if __name__ == "__main__":
         help="Highlight words",
     )
     parser.add_argument(
-        "--highlight-saturated",
+        "-c",
+        "--colors",
         action="store_true",
-        help="Highlights saturated areas",
+        help="Colored output",
     )
     parser.add_argument(
-        "--highlight-saturated-colors",
+        "--colors-palette",
         type=int,
-        default=1,
-        help="Number of colors for --highlight-saturated",
+        default=5,
+        help="Number of colors for --colors",
     )
     parser.add_argument(
-        "--highlight-saturated-brightness",
+        "--colors-offset",
         type=float,
-        default=0,
-        help="Offset to increase/decrease brightness of saturated highlights",
+        nargs=3,
+        default=[0, 0, 0],
+        help="Offsete for colors in HSV",
     )
     # parser.add_argument(
     #     "--background-text",
@@ -169,12 +171,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "-v", "--version", action="version", version=f"%(prog)s {kee.__version__}"
     )
+    parser.add_argument("-V", "--verbose", action="store_true")
     args = parser.parse_args()
     command_str = " ".join([a if a.startswith("-") else f'"{a}"' for a in sys.argv[1:]])
     header_text = (
-        None
-        if not args.write_header
-        else f"kee v{kee.__version__}\nkee.py {command_str}"
+        None if not args.write_header else f"kee v{kee.__version__}\nkee {command_str}"
     )
     kee.main(
         args.image,
@@ -189,9 +190,9 @@ if __name__ == "__main__":
         args.background_color,
         args.highlight_color,
         args.highlight_text,
-        args.highlight_saturated,
-        args.highlight_saturated_colors,
-        args.highlight_saturated_brightness,
+        args.colors,
+        args.colors_palette,
+        args.colors_offset,
         # args.background_text,
         # args.background_text_size,
         # args.background_text_color,
