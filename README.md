@@ -5,18 +5,18 @@
 <table>
   <tr>
     <td>
-      <img src="doc/limor_fried1.jpg" width=200 />
+      <img src="doc/limor_fried1.png" width=200 />
     </td>
     <td>
-      <img src="doc/limor_fried2.jpg" width=200 />
+      <img src="doc/limor_fried2.png" width=200 />
     </td>
   </tr>
   <tr>
   <td>
-      <img src="doc/limor_fried3.jpg" width=200 />
+      <img src="doc/limor_fried3.png" width=200 />
     </td>
     <td>
-      <img src="doc/limor_fried4.jpg" width=200 />
+      <img src="doc/limor_fried4.png" width=200 />
     </td>
   </tr>
 </table>
