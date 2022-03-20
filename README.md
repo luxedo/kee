@@ -2,7 +2,24 @@
 
 > Create ASCII (ass-kee) art as a pdf and print it!
 
-<img src="examples/dst/ada.jpg" width=200 />
+<table>
+  <tr>
+    <td>
+      <img src="doc/limor_fried1.jpg" width=200 />
+    </td>
+    <td>
+      <img src="doc/limor_fried2.jpg" width=200 />
+    </td>
+  </tr>
+  <tr>
+  <td>
+      <img src="doc/limor_fried3.jpg" width=200 />
+    </td>
+    <td>
+      <img src="doc/limor_fried4.jpg" width=200 />
+    </td>
+  </tr>
+</table>
 
 # Install
 

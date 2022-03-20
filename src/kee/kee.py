@@ -28,6 +28,9 @@ from skimage import color, exposure, io, transform
 from sklearn.cluster import KMeans
 
 __version__ = "1.0.0"
+MODULE_DIR = path.dirname(__file__)
+RGB_PROFILE = "sRGB2014.icc"
+CMYK_PROFILE = "USWebCoatedSWOP.icc"
 PAPER_SIZES = {
     "A0": (841, 1189),
     "A1": (594, 841),
@@ -43,8 +46,9 @@ PAPER_SIZES = {
     "B5": (176, 250),
 }
 DPI = 300
-SATURATION_THRESHOLD = 0.0
-VALUE_THRESHOLD = 0.0
+SATURATION_THRESHOLD = 0.01
+VALUE_THRESHOLD = 0.01
+DEFAULT_PALETTE = "@%#*+=-:. "
 
 
 def mm2in(mm):
@@ -57,11 +61,11 @@ def pixel_to_ascii(pixel, palette):
 
 def load_image(image_name, black_threshold, white_threshold):
     img = io.imread(image_name) / 256
-    # img[np.mean(img, axis=2) < black_threshold] = [0, 0, 0]
-    # img[np.mean(img, axis=2) > white_threshold] = [1, 1, 1]
     img = np.clip(img, black_threshold, white_threshold)
-    img = (img - img.min()) / (img.max() - img.min())
-    img = exposure.equalize_adapthist(img, clip_limit=0.03)
+    p2, p98 = np.percentile(img, (2, 98))
+    img = exposure.rescale_intensity(img, in_range=(p2, p98))
+    # img = exposure.equalize_adapthist(img, clip_limit=0.03)
+    # img = (img - img.min()) / (img.max() - img.min())
     return img
 
 
@@ -76,12 +80,12 @@ def build_ascii_art(
     img = load_image(image_name, black_threshold, white_threshold)
     height = round(width / img.shape[1] * img.shape[0] / character_ratio)
     img = transform.resize(img, (height, width))
+    gray = img.copy()
+    if gray.ndim == 3:
+        gray = color.rgb2gray(gray)
     return (
         "\n".join(
-            [
-                "".join([pixel_to_ascii(pixel, palette) for pixel in row])
-                for row in color.rgb2gray(img)
-            ]
+            ["".join([pixel_to_ascii(pixel, palette) for pixel in row]) for row in gray]
         ),
         img,
     )
@@ -148,8 +152,8 @@ def split_layers(
         text_layers.append(new_layer)
         color_layers.append(col)
 
-    art_split = [list(row) for row in ascii_art.split("\n")]
     # 2. Split saturation highlight from art
+    art_split = [list(row) for row in ascii_art.split("\n")]
     if colors:
         _, saturation, value = color.rgb2hsv(img).T
         saturation, value = saturation.T, value.T
@@ -217,7 +221,7 @@ def write_text(g, text_layers, color_layers, center, font_size):
                 "xml:space": "preserve",
                 "fill": color_,
                 "transform": f"translate(0, {center})",
-                "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;font-variant-ligatures: none;letter-spacing: -0.05em;",
+                "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;font-variant-ligatures: none;letter-spacing: -0.1em;",
             },
         )
         layer_split = layer.split("\n")
@@ -227,7 +231,7 @@ def write_text(g, text_layers, color_layers, center, font_size):
                 "tspan",
                 **{
                     "x": "50%",
-                    "y": f"{i-rows/2}em",
+                    "y": f"{(i-rows/2) * 0.8}em",
                 },
             )
             tspan.text = line
@@ -235,47 +239,12 @@ def write_text(g, text_layers, color_layers, center, font_size):
         g.append(text)
 
 
-# def write_background():
-# if background_text is not None:
-#     bgt_space = 0.66
-#     background_text += " "
-#     bgt_cols = math.floor(width / background_text_size * character_ratio)
-#     bgt_rows = math.ceil(height / background_text_size / bgt_space) + 1
-#     text = ET.Element(
-#         "text",
-#         **{
-#             "x": "0",
-#             "y": "0",
-#             "xml:space": "preserve",
-#             "fill": background_text_color,
-#             "style": f"font-size: {background_text_size};font-family: Courier;font-weight: bold;font-kerning: none;letter-spacing: -0.05em;",
-#         },
-#     )
-#     i = 0
-#     for row in range(bgt_rows):
-#         bg_text = ""
-#         while len(bg_text) < bgt_cols:
-#             bg_text += background_text[i]
-#             i += 1
-#             i %= len(background_text)
-#         tspan = ET.Element(
-#             "tspan",
-#             **{
-#                 "x": "0",
-#                 "y": f"{bgt_space +  row * bgt_space}em",
-#             },
-#         )
-#         tspan.text = bg_text
-#         text.append(tspan)
-#     g.append(text)
-
-
 def write_header(g, header_text, header_font_size, foreground_color):
     header = ET.Element(
         "text",
         **{
-            "x": f"{header_font_size}",
-            "y": f"{header_font_size}",
+            "x": f"{2*header_font_size}",
+            "y": f"{2*header_font_size}",
             "fill": foreground_color,
             "style": f"font-size: {header_font_size};",
         },
@@ -284,7 +253,7 @@ def write_header(g, header_text, header_font_size, foreground_color):
         tspan = ET.Element(
             "tspan",
             **{
-                "x": f"{header_font_size}",
+                "x": f"{2*header_font_size}",
                 "dy": "1em",
             },
         )
@@ -293,7 +262,7 @@ def write_header(g, header_text, header_font_size, foreground_color):
     g.append(header)
 
 
-def main(
+def kee(
     image_name,
     columns,
     palette,
@@ -314,22 +283,23 @@ def main(
     # background_text_color,
     header_text,
     paper_size,
-    svg_output,
     output,
 ):
 
     if invert_palette:
         palette = palette[::-1]
 
-    if svg_output is None:
-        tf = tempfile.NamedTemporaryFile(suffix=".svg")
-        svg_output = tf.name
-
     if output is None:
         output = path.splitext(image_name)[0] + ".pdf"
 
+    if not output.endswith(".svg"):
+        tf = tempfile.NamedTemporaryFile(suffix=".svg")
+        svg_output = tf.name
+    else:
+        svg_output = output
+
     width_mm, height_mm = PAPER_SIZES[paper_size]
-    width, height = (DPI * mm2in(dim) for dim in (width_mm, height_mm))
+    width, height = DPI * mm2in(width_mm), DPI * mm2in(height_mm)
 
     ascii_art, img = build_ascii_art(
         image_name, columns, palette, black_threshold, white_threshold, character_ratio
@@ -356,14 +326,19 @@ def main(
 
     tree = ET.ElementTree(svg)
     tree.write(svg_output, encoding="utf-8", xml_declaration=True)
-    run(
-        [
-            "convert",
-            "-density",
-            f"{DPI}",
-            "-units",
-            "PixelsPerInch",
-            svg_output,
-            output,
-        ]
-    )
+    if not output.endswith(".svg"):
+        run(
+            [
+                "convert",
+                "-density",
+                f"{DPI}",
+                "-units",
+                "PixelsPerInch",
+                "-profile",
+                path.join(MODULE_DIR, RGB_PROFILE),
+                svg_output,
+                "-profile",
+                path.join(MODULE_DIR, CMYK_PROFILE),
+                output,
+            ]
+        )

@@ -38,7 +38,11 @@ if __name__ == "__main__":
         "-w", "--width", type=int, default=480, help="Number of characters per row"
     )
     parser.add_argument(
-        "-p", "--palette", type=str, default="@%#*+=-:. ", help="Character palette"
+        "-p",
+        "--palette",
+        type=str,
+        default=kee.DEFAULT_PALETTE,
+        help="Character palette",
     )
     parser.add_argument(
         "-i",
@@ -71,7 +75,7 @@ if __name__ == "__main__":
         "-C",
         "--character-ratio",
         type=float,
-        default=2.0,
+        default=1.7,
         help="Character height to width ratio",
     )
     parser.add_argument(
@@ -132,7 +136,7 @@ if __name__ == "__main__":
     # parser.add_argument(
     #     "--background-text-size",
     #     type=float,
-    #     default=244,
+    #     default=360,
     #     help="Background text font size",
     # )
     # parser.add_argument(
@@ -155,29 +159,29 @@ if __name__ == "__main__":
         help="Print paper size",
     )
     parser.add_argument(
-        "-s",
-        "--svg-output",
-        default=None,  # Goes to /tmp
-        type=str,
-        help="Svg output file",
-    )
-    parser.add_argument(
         "-o",
         "--output",
         default=None,  # Same name as image
         type=str,
         help="Pdf output file",
     )
-    parser.add_argument(
-        "-v", "--version", action="version", version=f"%(prog)s {kee.__version__}"
-    )
+    # parser.add_argument(
+    #     "-v", "--version", action="version", version=f"%(prog)s {kee.__version__}"
+    # )
     parser.add_argument("-V", "--verbose", action="store_true")
     args = parser.parse_args()
-    command_str = " ".join([a if a.startswith("-") else f'"{a}"' for a in sys.argv[1:]])
-    header_text = (
-        None if not args.write_header else f"kee v{kee.__version__}\nkee {command_str}"
+    command_str = " ".join(
+        [
+            a if a.startswith("-") else '"' + re.sub(r'([$"])', r"\\\1", a) + '"'
+            for a in sys.argv[1:]
+        ]
     )
-    kee.main(
+    header_text = (
+        None
+        if not args.write_header
+        else f"kee v{kee.__version__} https://github.com/luxedo/kee\nkee {command_str}"
+    )
+    kee.kee(
         args.image,
         args.width,
         args.palette,
@@ -198,6 +202,5 @@ if __name__ == "__main__":
         # args.background_text_color,
         header_text,
         args.paper_size,
-        args.svg_output,
         args.output,
     )
