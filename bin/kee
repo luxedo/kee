@@ -75,7 +75,8 @@ if __name__ == "__main__":
         "-C",
         "--character-ratio",
         type=float,
-        default=1.7,
+        # default=1.7,
+        default=2,
         help="Character height to width ratio",
     )
     parser.add_argument(
@@ -163,7 +164,7 @@ if __name__ == "__main__":
         "--output",
         default=None,  # Same name as image
         type=str,
-        help="Pdf output file",
+        help="Output image filename. Outputs to stdout if empty",
     )
     # parser.add_argument(
     #     "-v", "--version", action="version", version=f"%(prog)s {kee.__version__}"

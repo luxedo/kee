@@ -97,6 +97,11 @@ def rgb2hex(rgb):
     ]
 
 
+def hex2rgb(_hex):
+    _hex = _hex.removeprefix("#")
+    return tuple(int(_hex[i : i + 2], 16) for i in (0, 2, 4))
+
+
 def build_palette(color_array, n_colors, value_offset):
     """
     Return palette in descending order of frequency
@@ -262,6 +267,30 @@ def write_header(g, header_text, header_font_size, foreground_color):
     g.append(header)
 
 
+def print_art(text_layers, color_layers, background_color):
+    if len(color_layers) == 1:
+        print("".join(text_layers[0]))
+        return
+    depth = len(text_layers)
+    fg_pattern = "\x1b[38;2;{0};{1};{2}m"
+    bg_pattern = "\x1b[48;2;{0};{1};{2}m"
+    rgb_layers = [fg_pattern.format(*hex2rgb(_hex)) for _hex in color_layers]
+    prev_color_idx = -1
+    print(bg_pattern.format(*hex2rgb(background_color)), end="")
+    for i in range(len(text_layers[0])):
+        for d in range(depth):
+            cell = text_layers[d][i]
+            if cell != " ":
+                if prev_color_idx == d:
+                    print(cell, end="")
+                else:
+                    print(rgb_layers[d] + cell, end="")
+                    prev_color_idx = d
+                break
+        else:
+            print(" ", end="")
+
+
 def kee(
     image_name,
     columns,
@@ -289,17 +318,11 @@ def kee(
     if invert_palette:
         palette = palette[::-1]
 
-    if output is None:
-        output = path.splitext(image_name)[0] + ".pdf"
-
-    if not output.endswith(".svg"):
+    if output is not None and not output.endswith(".svg"):
         tf = tempfile.NamedTemporaryFile(suffix=".svg")
         svg_output = tf.name
     else:
         svg_output = output
-
-    width_mm, height_mm = PAPER_SIZES[paper_size]
-    width, height = DPI * mm2in(width_mm), DPI * mm2in(height_mm)
 
     ascii_art, img = build_ascii_art(
         image_name, columns, palette, black_threshold, white_threshold, character_ratio
@@ -315,6 +338,13 @@ def kee(
         colors_offset,
         img,
     )
+
+    if output is None:
+        print_art(text_layers, color_layers, background_color)
+        return
+
+    width_mm, height_mm = PAPER_SIZES[paper_size]
+    width, height = DPI * mm2in(width_mm), DPI * mm2in(height_mm)
 
     svg, g = blank_svg(width_mm, height_mm, width, height, background_color)
 
