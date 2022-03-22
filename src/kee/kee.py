@@ -46,8 +46,8 @@ PAPER_SIZES = {
     "B5": (176, 250),
 }
 DPI = 300
-SATURATION_THRESHOLD = 0.01
-VALUE_THRESHOLD = 0.01
+SATURATION_THRESHOLD = 0.0
+VALUE_THRESHOLD = 0.0
 DEFAULT_PALETTE = "@%#*+=-:. "
 
 
@@ -64,8 +64,6 @@ def load_image(image_name, black_threshold, white_threshold):
     img = np.clip(img, black_threshold, white_threshold)
     p2, p98 = np.percentile(img, (2, 98))
     img = exposure.rescale_intensity(img, in_range=(p2, p98))
-    # img = exposure.equalize_adapthist(img, clip_limit=0.03)
-    # img = (img - img.min()) / (img.max() - img.min())
     return img
 
 
