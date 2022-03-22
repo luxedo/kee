@@ -75,10 +75,12 @@ def build_ascii_art(
     palette,
     black_threshold,
     white_threshold,
-    character_ratio,
+    letter_spacing,
 ):
     img = load_image(image_name, black_threshold, white_threshold)
-    height = round(width / img.shape[1] * img.shape[0] / character_ratio)
+    height = round(
+        width / img.shape[1] * img.shape[0] / 2 / letter_spacing
+    )  # 2 is the height to width ratio of characters
     img = transform.resize(img, (height, width))
     gray = img.copy()
     if gray.ndim == 3:
@@ -215,7 +217,7 @@ def blank_svg(width_mm, height_mm, width, height, background_color):
     return svg, g
 
 
-def write_text(g, text_layers, color_layers, center, font_size):
+def write_text(g, text_layers, color_layers, center, font_size, letter_spacing):
     for layer, color_ in zip(text_layers, color_layers):
         text = ET.Element(
             "text",
@@ -226,7 +228,7 @@ def write_text(g, text_layers, color_layers, center, font_size):
                 "xml:space": "preserve",
                 "fill": color_,
                 "transform": f"translate(0, {center})",
-                "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;font-variant-ligatures: none;letter-spacing: -0.1em;",
+                "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;font-variant-ligatures: none;letter-spacing: {letter_spacing - 0.8}em;",
             },
         )
         layer_split = layer.split("\n")
@@ -236,7 +238,7 @@ def write_text(g, text_layers, color_layers, center, font_size):
                 "tspan",
                 **{
                     "x": "50%",
-                    "y": f"{(i-rows/2) * 0.8}em",
+                    "y": f"{(i-rows/2) * letter_spacing}em",
                 },
             )
             tspan.text = line
@@ -299,7 +301,7 @@ def kee(
     font_size,
     black_threshold,
     white_threshold,
-    character_ratio,
+    letter_spacing,
     foreground_color,
     background_color,
     highlight_color,
@@ -325,7 +327,12 @@ def kee(
         svg_output = output
 
     ascii_art, img = build_ascii_art(
-        image_name, columns, palette, black_threshold, white_threshold, character_ratio
+        image_name,
+        columns,
+        palette,
+        black_threshold,
+        white_threshold,
+        letter_spacing,
     )
 
     text_layers, color_layers = split_layers(
@@ -348,7 +355,14 @@ def kee(
 
     svg, g = blank_svg(width_mm, height_mm, width, height, background_color)
 
-    write_text(g, text_layers, color_layers, center=height / 2, font_size=font_size)
+    write_text(
+        g,
+        text_layers,
+        color_layers,
+        center=height / 2,
+        font_size=font_size,
+        letter_spacing=letter_spacing,
+    )
 
     if header_text is not None:
         header_font_size = 16

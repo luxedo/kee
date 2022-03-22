@@ -72,12 +72,11 @@ if __name__ == "__main__":
         help="Image threshold for white",
     )
     parser.add_argument(
-        "-C",
-        "--character-ratio",
+        "-L",
+        "--letter-spacing",
         type=float,
-        # default=1.7,
-        default=2,
-        help="Character height to width ratio",
+        default=0.75,
+        help="Letter separation. Both in rows and columns",
     )
     parser.add_argument(
         "-F",
@@ -190,7 +189,7 @@ if __name__ == "__main__":
         args.font_size,
         args.black_threshold,
         args.white_threshold,
-        args.character_ratio,
+        args.letter_spacing,
         args.foreground_color,
         args.background_color,
         args.highlight_color,
