@@ -46,9 +46,8 @@ PAPER_SIZES = {
     "B5": (176, 250),
 }
 DPI = 300
-SATURATION_THRESHOLD = 0.0
-VALUE_THRESHOLD = 0.0
 DEFAULT_PALETTE = "@%#*+=-:. "
+CHARACTER_RATIO = 2
 
 
 def mm2in(mm):
@@ -77,7 +76,7 @@ def build_ascii_art(
 ):
     img = load_image(image_name, black_threshold, white_threshold)
     height = round(
-        width / img.shape[1] * img.shape[0] / 2 / letter_spacing
+        width / img.shape[1] * img.shape[0] / CHARACTER_RATIO / letter_spacing
     )  # 2 is the height to width ratio of characters
     img = transform.resize(img, (height, width))
     gray = img.copy()
@@ -107,10 +106,12 @@ def build_palette(color_array, n_colors, value_offset):
     Return palette in descending order of frequency
     """
     kmeans = KMeans(n_clusters=n_colors)
-    X = color_array.reshape((-1, 3))
+    X = color_array.reshape((-1, 3 if color_array.ndim == 3 else 1))
     kmeans.fit(X)
     colors_ = kmeans.cluster_centers_
-    if value_offset != 0:
+    if color_array.ndim == 2:
+        colors_ = [np.array(c.tolist() * 3) for c in colors_]
+    if value_offset != [0, 0, 0]:
         hls = [colorsys.rgb_to_hls(*c) for c in colors_]
         colors_ = np.array(
             [
@@ -160,18 +161,19 @@ def split_layers(
     # 2. Split saturation highlight from art
     art_split = [list(row) for row in ascii_art.split("\n")]
     if colors:
-        _, saturation, value = color.rgb2hsv(img).T
-        saturation, value = saturation.T, value.T
-        colors = img[(saturation > SATURATION_THRESHOLD) & (value > VALUE_THRESHOLD)]
-        model, centers, colors = build_palette(colors, colors_palette, colors_offset)
-        closest = np.linalg.norm([img - center for center in centers], axis=3)
+        model, centers, colors = build_palette(img, colors_palette, colors_offset)
+        if img.ndim == 2:
+            closest = np.array([(img - center) ** 2 for center in centers])
+        else:
+            closest = np.linalg.norm([img - center for center in centers], axis=3)
         closest = closest.argmin(axis=0)
         hs_layers = [
             [[" " for _ in range(columns)] for _ in range(rows)] for _ in colors
         ]
-        for i, j in np.argwhere(saturation > SATURATION_THRESHOLD):
-            hs_layers[closest[i][j]][i][j] = art_split[i][j]
-            art_split[i][j] = " "
+        for i in range(len(art_split)):
+            for j in range(len(art_split[i])):
+                hs_layers[closest[i][j]][i][j] = art_split[i][j]
+                art_split[i][j] = " "
         hs_layers = ["\n".join(["".join(row) for row in layer]) for layer in hs_layers]
         text_layers.extend(hs_layers)
         color_layers.extend(colors)
@@ -226,7 +228,7 @@ def write_text(g, text_layers, color_layers, center, font_size, letter_spacing):
                 "xml:space": "preserve",
                 "fill": color_,
                 "transform": f"translate(0, {center})",
-                "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;font-variant-ligatures: none;letter-spacing: {letter_spacing - 0.8}em;",
+                "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;font-variant-ligatures: none;letter-spacing: {letter_spacing - 0.7}em;",
             },
         )
         layer_split = layer.split("\n")
@@ -274,6 +276,11 @@ def print_art(text_layers, color_layers, background_color):
     depth = len(text_layers)
     fg_pattern = "\x1b[38;2;{0};{1};{2}m"
     bg_pattern = "\x1b[48;2;{0};{1};{2}m"
+    if len(background_color) < 7:
+        background_color = f"#{background_color[1] * 2}{background_color[2] * 2}{background_color[3] * 2}"
+    color_layers = [
+        f"#{c[1] * 2}{c[2] * 2}{c[3] * 2}" if len(c) < 7 else c for c in color_layers
+    ]
     rgb_layers = [fg_pattern.format(*hex2rgb(_hex)) for _hex in color_layers]
     prev_color_idx = -1
     print(bg_pattern.format(*hex2rgb(background_color)), end="")
@@ -312,19 +319,14 @@ def kee(
     # background_text_color,
     header_text,
     paper_size,
+    landscape,
     output,
 ):
 
     if invert_palette:
         palette = palette[::-1]
 
-    if output is not None and not output.endswith(".svg"):
-        tf = tempfile.NamedTemporaryFile(suffix=".svg")
-        svg_output = tf.name
-    else:
-        svg_output = output
-
-    ascii_art, img = build_ascii_art(
+    ascii_art, image = build_ascii_art(
         image_name,
         columns,
         palette,
@@ -332,6 +334,53 @@ def kee(
         white_threshold,
         letter_spacing,
     )
+    ascii_to_document(
+        image,
+        ascii_art,
+        font_size,
+        letter_spacing,
+        foreground_color,
+        background_color,
+        highlight_color,
+        highlight_text,
+        colors,
+        colors_palette,
+        colors_offset,
+        # background_text,
+        # background_text_size,
+        # background_text_color,
+        header_text,
+        paper_size,
+        landscape,
+        output,
+    )
+
+
+def ascii_to_document(
+    image,
+    ascii_art,
+    font_size,
+    letter_spacing,
+    foreground_color,
+    background_color,
+    highlight_color,
+    highlight_text,
+    colors,
+    colors_palette,
+    colors_offset,
+    # background_text,
+    # background_text_size,
+    # background_text_color,
+    header_text,
+    paper_size,
+    landscape,
+    output,
+):
+    if output is not None and not output.endswith(".svg"):
+        tf = tempfile.NamedTemporaryFile(suffix=".svg")
+        svg_output = tf.name
+    else:
+        svg_output = output
 
     text_layers, color_layers = split_layers(
         ascii_art,
@@ -341,7 +390,7 @@ def kee(
         colors,
         colors_palette,
         colors_offset,
-        img,
+        image,
     )
 
     if output is None:
@@ -349,6 +398,8 @@ def kee(
         return
 
     width_mm, height_mm = PAPER_SIZES[paper_size]
+    if landscape:
+        width_mm, height_mm = height_mm, width_mm
     width, height = DPI * mm2in(width_mm), DPI * mm2in(height_mm)
 
     svg, g = blank_svg(width_mm, height_mm, width, height, background_color)
@@ -384,3 +435,88 @@ def kee(
                 output,
             ]
         )
+
+
+def build_ascii_art2(
+    image_name,
+    text_name,
+    columns,
+    font_size,
+    black_threshold,
+    white_threshold,
+):
+    img = load_image(image_name, black_threshold, white_threshold)
+    width = columns
+    height = math.ceil(width * img.shape[0] / img.shape[1])
+    img = transform.resize(img, (height, width))
+    with open(text_name, "r") as fp:
+        text = fp.read()
+
+    text = re.sub("\\n+", " ", text)
+    text = re.sub("[ ]+", " ", text)
+    text = text.replace("\n", "¶ ")
+
+    text = "\n".join(
+        text[i * columns : (i + 1) * columns] for i in range(math.ceil(height))
+    )
+    text = text + " " * ((len(text) % columns) - columns)
+
+    return text, img
+
+
+def kee2(
+    image_name,
+    text_name,
+    width,
+    font_size,
+    black_threshold,
+    white_threshold,
+    letter_spacing,
+    foreground_color,
+    background_color,
+    highlight_color,
+    highlight_text,
+    colors,
+    colors_palette,
+    colors_offset,
+    # background_text,
+    # background_text_size,
+    # background_text_color,
+    header_text,
+    paper_size,
+    landscape,
+    output,
+):
+    ascii_art, image = build_ascii_art2(
+        image_name,
+        text_name,
+        width,
+        font_size,
+        black_threshold,
+        white_threshold,
+    )
+    if not colors:
+        if image.ndim != 2:
+            image = color.rgb2gray(image)
+        colors = True
+
+    ascii_to_document(
+        image,
+        ascii_art,
+        font_size,
+        letter_spacing,
+        foreground_color,
+        background_color,
+        highlight_color,
+        highlight_text,
+        colors,
+        colors_palette,
+        colors_offset,
+        # background_text,
+        # background_text_size,
+        # background_text_color,
+        header_text,
+        paper_size,
+        landscape,
+        output,
+    )

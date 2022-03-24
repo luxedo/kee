@@ -159,6 +159,12 @@ if __name__ == "__main__":
         help="Print paper size",
     )
     parser.add_argument(
+        "-l",
+        "--landscape",
+        action="store_true",
+        help="Creates document in landscape orientation",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         default=None,  # Same name as image
@@ -202,5 +208,6 @@ if __name__ == "__main__":
         # args.background_text_color,
         header_text,
         args.paper_size,
+        args.landscape,
         args.output,
     )
