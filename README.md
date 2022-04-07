@@ -23,6 +23,8 @@
 
 # Install
 
+> ⚠️ kee is still under development and has not been published yet
+
 `kee` uses [ImageMagick](https://imagemagick.org/index.php) to create
 images so please install the most recent version. Then
 install `kee` with [pip](https://pip.pypa.io/en/stable/).

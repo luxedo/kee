@@ -19,8 +19,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import argparse
 import re
 import sys
+import tempfile
 
 import kee
+
+
+def main(
+    image,
+    width,
+    palette,
+    invert_palette,
+    font_size,
+    black_threshold,
+    white_threshold,
+    letter_spacing,
+    line_height,
+    foreground_color,
+    background_color,
+    highlight_color,
+    highlight_text,
+    colors,
+    color_palette,
+    color_offset,
+    write_header,
+    paper_size,
+    landscape,
+    translate_x,
+    translate_y,
+    output,
+):
+    if foreground_color is not None:
+        foreground_color = kee.hex2rgb(foreground_color)
+    if background_color is not None:
+        background_color = kee.hex2rgb(background_color)
+
+    k = kee.Kee(
+        image,
+        width,
+        default_color=foreground_color,
+        default_background_color=background_color,
+        black_threshold=black_threshold,
+        white_threshold=white_threshold,
+        letter_spacing=letter_spacing,
+        line_height=line_height,
+    )
+    text = k.character_palette_text(
+        character_palette=palette,
+        invert_palette=invert_palette,
+    )
+
+    layers = kee.StackedLayers()
+
+    if len(highlight_text) > 0:
+        highlight_layers, text = k.text_to_highlight_layers(
+            text, highlight_text, [kee.hex2rgb(col) for col in highlight_color]
+        )
+        layers += highlight_layers
+
+    layers += k.text_to_layers(
+        text,
+        color=foreground_color,
+        background_color=background_color,
+        color_palette=color_palette if colors else None,
+        color_offset=color_offset if colors else None,
+    )
+
+    if output is None:
+        print(layers)
+        return
+
+    if write_header:
+        command_str = " ".join(
+            [
+                a if a.startswith("-") else '"' + re.sub(r'([$"])', r"\\\1", a) + '"'
+                for a in sys.argv[1:]
+            ]
+        )
+        header_text = (
+            f"kee v{kee.__version__} https://github.com/luxedo/kee\nkee {command_str}"
+        )
+        k.add_header(header_text)
+
+    return k.to_image(
+        layers,
+        output,
+        shape=kee.PAPER_SIZES[paper_size],
+        font_size=font_size,
+        translate_x=translate_x,
+        translate_y=translate_y,
+    )
 
 
 def hex_string(value):
@@ -41,7 +128,7 @@ if __name__ == "__main__":
         "-p",
         "--palette",
         type=str,
-        default=kee.DEFAULT_PALETTE,
+        default=kee.Kee.default_character_palette,
         help="Character palette",
     )
     parser.add_argument(
@@ -72,10 +159,17 @@ if __name__ == "__main__":
         help="Image threshold for white",
     )
     parser.add_argument(
-        "-L",
+        "-S",
         "--letter-spacing",
         type=float,
-        default=0.75,
+        default=0.0,
+        help="Letter separation. Both in rows and columns",
+    )
+    parser.add_argument(
+        "-L",
+        "--line-height",
+        type=float,
+        default=1.15,
         help="Letter separation. Both in rows and columns",
     )
     parser.add_argument(
@@ -110,41 +204,23 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-c",
-        "--colors",
+        "--color",
         action="store_true",
         help="Colored output",
     )
     parser.add_argument(
-        "--colors-palette",
+        "--color-palette",
         type=int,
         default=5,
         help="Number of colors for --colors",
     )
     parser.add_argument(
-        "--colors-offset",
+        "--color-offset",
         type=float,
         nargs=3,
         default=[0, 0, 0],
         help="Offsete for colors in HSV",
     )
-    # parser.add_argument(
-    #     "--background-text",
-    #     type=str,
-    #     default=None,
-    #     help="Background text",
-    # )
-    # parser.add_argument(
-    #     "--background-text-size",
-    #     type=float,
-    #     default=360,
-    #     help="Background text font size",
-    # )
-    # parser.add_argument(
-    #     "--background-text-color",
-    #     type=hex_string,
-    #     default="#BBB",
-    #     help="Background text color",
-    # )
     parser.add_argument(
         "-H",
         "--write-header",
@@ -165,29 +241,31 @@ if __name__ == "__main__":
         help="Creates document in landscape orientation",
     )
     parser.add_argument(
+        "--translate-x",
+        type=float,
+        default=0,
+        help="Translates the image horizontally in em",
+    )
+    parser.add_argument(
+        "--translate-y",
+        type=float,
+        default=0,
+        help="Translates the image vertically in em",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         default=None,  # Same name as image
         type=str,
         help="Output image filename. Outputs to stdout if empty",
     )
-    # parser.add_argument(
-    #     "-v", "--version", action="version", version=f"%(prog)s {kee.__version__}"
-    # )
+    parser.add_argument(
+        "-v", "--version", action="version", version=f"%(prog)s {kee.__version__}"
+    )
     parser.add_argument("-V", "--verbose", action="store_true")
     args = parser.parse_args()
-    command_str = " ".join(
-        [
-            a if a.startswith("-") else '"' + re.sub(r'([$"])', r"\\\1", a) + '"'
-            for a in sys.argv[1:]
-        ]
-    )
-    header_text = (
-        None
-        if not args.write_header
-        else f"kee v{kee.__version__} https://github.com/luxedo/kee\nkee {command_str}"
-    )
-    kee.kee(
+
+    main(
         args.image,
         args.width,
         args.palette,
@@ -196,18 +274,18 @@ if __name__ == "__main__":
         args.black_threshold,
         args.white_threshold,
         args.letter_spacing,
+        args.line_height,
         args.foreground_color,
         args.background_color,
         args.highlight_color,
         args.highlight_text,
-        args.colors,
-        args.colors_palette,
-        args.colors_offset,
-        # args.background_text,
-        # args.background_text_size,
-        # args.background_text_color,
-        header_text,
+        args.color,
+        args.color_palette,
+        args.color_offset,
+        args.write_header,
         args.paper_size,
         args.landscape,
+        args.translate_x,
+        args.translate_y,
         args.output,
     )
