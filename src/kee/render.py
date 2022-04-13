@@ -28,7 +28,7 @@ def mm2in(mm):
 
 
 class Render:
-    def __call__(self, layers, filename: str | None = None) -> str:
+    def render(self, layers, filename: str | None = None) -> str:
         if type(layers) == kee_layer.Layer:
             layers = kee_layer.StackedLayers([layers])
         if filename:
@@ -44,7 +44,7 @@ class TerminalRender(Render):
     terminal_color = "\x1b[38;2;{red};{green};{blue}m"
     terminal_bg_color = "\x1b[48;2;{red};{green};{blue}m"
 
-    def __call__(self, layers, filename: str | None = None) -> str:
+    def render(self, layers, filename: str | None = None) -> str:
         if type(layers) == kee_layer.Layer:
             layers = kee_layer.StackedLayers([layers])
 
@@ -116,7 +116,7 @@ class SvgRender(Render):
         self.translate_x = self.font_size * self.dpi_ratio * translate_x
         self.translate_y = self.font_size * self.dpi_ratio * translate_y
 
-    def __call__(self, layers, filename: str | None = None) -> str:
+    def render(self, layers, filename: str | None = None) -> str:
         if type(layers) == kee_layer.Layer:
             layers = kee_layer.StackedLayers([layers])
         svg = self._blank_svg(
@@ -249,13 +249,13 @@ class ImageRender(SvgRender):
     rgb_profile = path.join(module_dir, "sRGB2014.icc")
     cmyk_profile = path.join(module_dir, "USWebCoatedSWOP.icc")
 
-    def __call__(self, layers, filename: str | None = None) -> str | bytes | None:
+    def render(self, layers, filename: str | None = None) -> str | bytes | None:
         if filename is not None and filename.endswith(".svg"):
-            return super().__call__(layers, filename)
+            return super().render(layers, filename)
 
         svg_tf = tempfile.NamedTemporaryFile(suffix=".svg")
         svg_output = svg_tf.name
-        super().__call__(layers, svg_output)
+        super().render(layers, svg_output)
         if filename is None:
             pdf_tf = tempfile.NamedTemporaryFile(suffix=".pdf")
             filename = pdf_tf.name

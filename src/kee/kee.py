@@ -18,11 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import colorsys
 import math
 import re
-import tempfile
-from io import StringIO
 from os import path
-from subprocess import run
-from typing import Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -31,7 +27,7 @@ from skimage import exposure, io, transform
 from sklearn.cluster import KMeans
 
 from .layer import Layer, StackedLayers, hex2rgb, rgb2hex
-from .render import ImageRender, SvgRender, TerminalRender
+from .render import ImageRender
 
 __version__ = "1.0.0"
 MODULE_DIR = path.dirname(__file__)
@@ -126,10 +122,10 @@ class Kee:
         else:
             self.gray_img = self.colored_img
 
-    def __repr__(self):
-        return (
-            f'{self.__class__.__name__}("{self.filename}", {self.width}, {self.height})'
-        )
+    # def __repr__(self):
+    #     return (
+    #         f'{self.__class__.__name__}("{self.filename}", {self.width}, {self.height})'
+    #     )
 
     # def __str__(self):
     #     if not hasattr(self, "terminal_output"):
@@ -165,10 +161,10 @@ class Kee:
     def text_to_layers(
         self,
         text: str,
-        color: Optional[tuple[int, int, int]] = None,
-        background_color: Optional[tuple[int, int, int]] = None,
-        colors_palette: Optional[int] = None,
-        hsv_offset: Optional[tuple[float, float, float]] = (0, 0, 0),
+        color: tuple[int, int, int] | None = None,
+        background_color: tuple[int, int, int] | None = None,
+        colors_palette: int | None = None,
+        hsv_offset: tuple[float, float, float] | None = (0, 0, 0),
     ):
         layer = Layer(
             text,
@@ -187,8 +183,8 @@ class Kee:
         layer: Layer,
         image: np.ndarray,
         colors_palette: int,
-        hsv_offset: Optional[tuple[float, float, float]] = (0, 0, 0),
-        background_color: Optional[tuple[int, int, int]] = None,
+        hsv_offset: tuple[float, float, float] | None = (0, 0, 0),
+        background_color: tuple[int, int, int] | None = None,
     ):
         height, width, _ = image.shape
         color_array = image.reshape((-1, 3))
@@ -227,7 +223,7 @@ class Kee:
     def to_image(
         self,
         layer: Layer,
-        filename: Optional[str] = None,
+        filename: str | None = None,
         /,
         shape: tuple[float, float] = portrait_sizes["A4"],
         font_size: float = 10,
@@ -235,22 +231,20 @@ class Kee:
         translate_x: float = 0,
         translate_y: float = 0,
     ):
-        return layer.render(
-            ImageRender(
-                shape,
-                self.default_color,
-                self.default_background_color,
-                self.dpi,
-                font_size,
-                font_family,
-                self.letter_spacing,
-                self.line_height,
-                self.header_text,
-                translate_x,
-                translate_y,
-            ),
-            filename,
+        r = ImageRender(
+            shape,
+            self.default_color,
+            self.default_background_color,
+            self.dpi,
+            font_size,
+            font_family,
+            self.letter_spacing,
+            self.line_height,
+            self.header_text,
+            translate_x,
+            translate_y,
         )
+        return r.render(layer, filename)
 
     @staticmethod
     def build_palette(

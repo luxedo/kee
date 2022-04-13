@@ -15,21 +15,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import colorsys
-import math
-import re
-import tempfile
 from collections.abc import Iterable
 from itertools import zip_longest
-from os import path
-from subprocess import run
-from typing import Optional
-from xml.etree import ElementTree as ET
 
 import numpy as np
-from sklearn.cluster import KMeans
 
-from .render import Render, TerminalRender
+from .render import TerminalRender
 
 
 def rgb2hex(red, green, blue):
@@ -55,13 +46,11 @@ class Layer:
     def __init__(
         self,
         text: str,
-        color: Optional[tuple[int, int, int]] = None,
-        background_color: Optional[tuple[int, int, int]] = None,
-        render: Render = TerminalRender(),
+        color: tuple[int, int, int] | None = None,
+        background_color: tuple[int, int, int] | None = None,
     ):
         self.color = color
         self.background_color = background_color
-        self._render = render
         self._text = [list(line) for line in text.split("\n")]
         self.rows = len(self._text)
 
@@ -76,7 +65,7 @@ class Layer:
         return self._text[index]
 
     def __str__(self):
-        return self.render()
+        return TerminalRender(self).render()
 
     def __add__(self, other):
         return StackedLayers([self, other])
@@ -84,14 +73,6 @@ class Layer:
     @property
     def text(self) -> str:
         return "\n".join("".join(line) for line in self._text)
-
-    def render(
-        self, optional_render: Optional[Render] = None, filename: Optional[str] = None
-    ):
-        if optional_render is None:
-            return self._render(self, filename)
-        else:
-            return optional_render(self, filename)
 
 
 class StackedLayersRow:
@@ -115,9 +96,9 @@ class StackedLayersRow:
 
 class StackedLayers(Layer):
     def __init__(
-        self, layers: Layer | Iterable[Layer] = [], render: Render = TerminalRender()
+        self,
+        layers: Layer | Iterable[Layer] = [],
     ):
-        self._render = render
         self.layers = []
         if type(layers) == Layer:
             layers = [layers]
