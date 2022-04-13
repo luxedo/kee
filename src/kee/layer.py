@@ -15,12 +15,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from collections.abc import Iterable
 import colorsys
-from itertools import zip_longest
 import math
 import re
 import tempfile
+from collections.abc import Iterable
+from itertools import zip_longest
 from os import path
 from subprocess import run
 from typing import Optional
@@ -62,7 +62,7 @@ class Layer:
         self.color = color
         self.background_color = background_color
         self._render = render
-        self._text = [list(l) for l in text.split("\n")]
+        self._text = [list(line) for line in text.split("\n")]
         self.rows = len(self._text)
 
     def __len__(self):
@@ -83,7 +83,7 @@ class Layer:
 
     @property
     def text(self) -> str:
-        return "\n".join("".join(l) for l in self._text)
+        return "\n".join("".join(line) for line in self._text)
 
     def render(
         self, optional_render: Optional[Render] = None, filename: Optional[str] = None
@@ -121,11 +121,11 @@ class StackedLayers(Layer):
         self.layers = []
         if type(layers) == Layer:
             layers = [layers]
-        for l in layers:
-            if type(l) == Layer:
-                self.layers.append(l)
-            elif isinstance(l, StackedLayers):
-                self.layers.extend(l.layers)
+        for layer in layers:
+            if type(layer) == Layer:
+                self.layers.append(layer)
+            elif isinstance(layer, StackedLayers):
+                self.layers.extend(layer.layers)
             else:
                 raise ValueError(f"Object {layer} is not a Layer type.")
         self.rows = max([layer.rows for layer in self.layers], default=0)
@@ -147,140 +147,3 @@ class StackedLayers(Layer):
             )
             for i, merge_row in enumerate(self.merged)
         ]
-
-
-class SvgLayer:
-    def __init__(self, layers, width_mm, height_mm, background_color):
-        self.layers = layers
-        self.width_mm = width_mm
-        self.height_mm = height_mm
-        self.background_color = background_color
-        self.svg = self._blank_svg(width_mm, height_mm)
-        self.g = ET.Element("g")
-        self.svg.append(self.g)
-        self.background_rect = self._set_background(self.g, background_color)
-        self.text = self._write_text(self.g, self.layers, 16, 1)
-        self.tree = ET.ElementTree(self.svg)
-
-    def _blank_svg(self, width_mm, height_mm):
-        svg = ET.Element(
-            "svg",
-            **{
-                "width": f"{self.width_mm}mm",
-                "height": f"{self.height_mm}mm",
-                "version": "1.1",
-                "viewBox": f"0 0 {self.width_mm} {self.height_mm}",
-                "xmlns": "http://www.w3.org/2000/svg",
-                "xmlns:svg": "http://www.w3.org/2000/svg",
-            },
-        )
-        return svg
-
-    def _set_background(self, g, background_color):
-        rect = ET.Element(
-            "rect",
-            **{
-                "x": "0",
-                "y": "0",
-                "width": f"{self.width_mm}",
-                "height": f"{self.height_mm}",
-                "fill": background_color,
-            },
-        )
-        g.append(rect)
-        return rect
-
-    def _write_text(self, g, layer, font_size, letter_spacing):
-        text = ET.Element(
-            "text",
-            **{
-                "x": "50%",
-                "y": "50%",
-                "text-anchor": "middle",
-                "xml:space": "preserve",
-                "fill": f"{'#AAA'}",
-                "transform": f"translate(0, {self.height_mm/2})",
-                "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;font-variant-ligatures: none;letter-spacing: 0em;",
-            },
-        )
-        prev_color = None
-        prev_bg_color = None
-        flat = ""
-        rows = len(layer.text.split("\n"))
-        i = 0
-        for char, color, bg_color in zip(
-            layer.text, layer.color_list, layer.bg_color_list
-        ):
-            if i == 0 or char == "\n":
-                tspan = ET.Element(
-                    "tspan",
-                    **{
-                        "x": "50%",
-                        "y": f"{(i-rows/2)}em",
-                    },
-                )
-                text.append(tspan)
-                i += 1
-            tspan.text += char
-            print(char, end="")
-        #     if bg_color != prev_bg_color:
-        #         flat += self.bg_colormap[bg_color]
-        #         prev_bg_color = bg_color
-        #     if color != prev_color:
-        #         flat += self.colormap[color]
-        #         prev_color = color
-        #     flat += char
-        # flat += self.terminal_reset
-        # return flat
-
-        # for layer, color_ in zip(text_layers, color_layers):
-        #     text = ET.Element(
-        #         "text",
-        #         **{
-        #             "x": "50%",
-        #             "y": "50%",
-        #             "text-anchor": "middle",
-        #             "xml:space": "preserve",
-        #             "fill": color_,
-        #             "transform": f"translate(0, {center})",
-        #             "style": f"font-size: {font_size};font-family: Courier;font-weight: bold;font-kerning: none;font-variant-ligatures: none;letter-spacing: {letter_spacing - 0.7}em;",
-        #         },
-        #     )
-        #     layer_split = layer.split("\n")
-        #     rows = len(layer_split)
-        #     for i, line in enumerate(layer_split):
-        #         tspan = ET.Element(
-        #             "tspan",
-        #             **{
-        #                 "x": "50%",
-        #                 "y": f"{(i-rows/2) * letter_spacing}em",
-        #             },
-        #         )
-        #         tspan.text = line
-        #         text.append(tspan)
-        #     g.append(text)
-
-    # def write_header(g, header_text, header_font_size, foreground_color):
-    #     header = ET.Element(
-    #         "text",
-    #         **{
-    #             "x": f"{2*header_font_size}",
-    #             "y": f"{2*header_font_size}",
-    #             "fill": foreground_color,
-    #             "style": f"font-size: {header_font_size};",
-    #         },
-    #     )
-    #     for line in header_text.split("\n"):
-    #         tspan = ET.Element(
-    #             "tspan",
-    #             **{
-    #                 "x": f"{2*header_font_size}",
-    #                 "dy": "1em",
-    #             },
-    #         )
-    #         tspan.text = line
-    #         header.append(tspan)
-    #     g.append(header)
-
-    def write(self, filename):
-        self.tree.write(filename, encoding="utf-8", xml_declaration=True)

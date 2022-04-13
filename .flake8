@@ -1,2 +1,2 @@
 [flake8]
-ignore = E501, E203, F403 __init__.py, F401 __init__.py
+ignore = W503, W504, E501, E203, F403 __init__.py, F401 __init__.py

@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import argparse
+import math
 import re
 import sys
 import tempfile
@@ -24,71 +25,62 @@ import tempfile
 import kee
 
 
-def main(
-    image,
-    width,
-    palette,
-    invert_palette,
-    font_size,
-    black_threshold,
-    white_threshold,
-    letter_spacing,
-    line_height,
-    foreground_color,
-    background_color,
-    highlight_color,
-    highlight_text,
-    colors,
-    color_palette,
-    color_offset,
-    write_header,
-    paper_size,
-    landscape,
-    translate_x,
-    translate_y,
-    output,
-):
-    if foreground_color is not None:
-        foreground_color = kee.hex2rgb(foreground_color)
-    if background_color is not None:
-        background_color = kee.hex2rgb(background_color)
+def main(args):
+    if args.color is not None:
+        args.color = kee.hex2rgb(args.color)
+    if args.background_color is not None:
+        args.background_color = kee.hex2rgb(args.background_color)
 
     k = kee.Kee(
-        image,
-        width,
-        default_color=foreground_color,
-        default_background_color=background_color,
-        black_threshold=black_threshold,
-        white_threshold=white_threshold,
-        letter_spacing=letter_spacing,
-        line_height=line_height,
+        args.image,
+        args.width,
+        default_color=args.color,
+        default_background_color=args.background_color,
+        black_threshold=args.black_threshold,
+        white_threshold=args.white_threshold,
+        letter_spacing=args.letter_spacing,
+        line_height=args.line_height,
     )
-    text = k.character_palette_text(
-        character_palette=palette,
-        invert_palette=invert_palette,
-    )
+
+    if args.mode == "char-palette":
+        text = k.character_palette_text(
+            character_palette=args.palette,
+            invert_palette=args.invert_palette,
+        )
+    elif args.mode == "text":
+        with open(args.text, "r") as fp:
+            text = fp.read()
+        text = re.sub("\\n+", "\n", text)
+        text = re.sub("[ ]+", " ", text)
+        text = text.replace("\n", "¶ ")
+        text = "\n".join(
+            text[i * k.cols : (i + 1) * k.cols] for i in range(math.ceil(k.rows))
+        )
+        text = text + " " * ((len(text) % k.cols) - k.cols)
 
     layers = kee.StackedLayers()
 
-    if len(highlight_text) > 0:
+    if len(args.highlight_text) > 0:
         highlight_layers, text = k.text_to_highlight_layers(
-            text, highlight_text, [kee.hex2rgb(col) for col in highlight_color]
+            text,
+            args.highlight_text,
+            [kee.hex2rgb(col) for col in args.highlight_color],
         )
         layers += highlight_layers
 
     layers += k.text_to_layers(
         text,
-        color=foreground_color,
-        background_color=background_color,
-        color_palette=color_palette if colors else None,
-        color_offset=color_offset if colors else None,
+        color=args.color,
+        background_color=args.background_color,
+        colors_palette=args.colors_palette,
+        hsv_offset=args.hsv_offset,
     )
 
-    if output is None:
+    if args.output is None:
         print(layers)
         return
 
-    if write_header:
+    if args.write_header:
         command_str = " ".join(
             [
                 a if a.startswith("-") else '"' + re.sub(r'([$"])', r"\\\1", a) + '"'
@@ -102,11 +94,16 @@ def main(
 
     return k.to_image(
         layers,
-        output,
-        shape=kee.PAPER_SIZES[paper_size],
-        font_size=font_size,
-        translate_x=translate_x,
-        translate_y=translate_y,
+        args.output,
+        shape=(
+            kee.Kee.portrait_sizes[args.paper_size]
+            if not args.landscape
+            else kee.Kee.landscape_sizes[args.paper_size]
+        ),
+        font_size=args.font_size,
+        font_family=args.font_family,
+        translate_x=args.translate_x,
+        translate_y=args.translate_y,
     )
 
 
@@ -118,174 +115,177 @@ def hex_string(value):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Creates a pdf document with given picture as ASCII art."
+        description="Creates ASCII art for the terminal and for printing."
     )
-    parser.add_argument("image", help="source image file")
-    parser.add_argument(
-        "-w", "--width", type=int, default=480, help="Number of characters per row"
+    subparsers = parser.add_subparsers(
+        help="Art mode. Check https://github.com/luxedo/kee/modes.md for examples.",
+        dest="mode",
     )
-    parser.add_argument(
+    parser_cp = subparsers.add_parser(
+        "char-palette",
+    )
+    parser_t = subparsers.add_parser(
+        "text",
+    )
+
+    parser_cp.add_argument(
         "-p",
         "--palette",
         type=str,
         default=kee.Kee.default_character_palette,
         help="Character palette",
     )
-    parser.add_argument(
+    parser_cp.add_argument(
         "-i",
         "--invert-palette",
         action="store_true",
         help="Inverts the color palette",
     )
-    parser.add_argument(
-        "-f",
-        "--font-size",
-        type=float,
-        default=12,
-        help="Font size",
+    parser_t.add_argument(
+        "-r", "--repeat", action="store_true", help="Repeats text to fill image"
     )
-    parser.add_argument(
-        "-K",
-        "--black-threshold",
-        type=float,
-        default=0,
-        help="Image threshold for black",
-    )
-    parser.add_argument(
-        "-W",
-        "--white-threshold",
-        type=float,
-        default=1,
-        help="Image threshold for white",
-    )
-    parser.add_argument(
-        "-S",
-        "--letter-spacing",
-        type=float,
-        default=0.0,
-        help="Letter separation. Both in rows and columns",
-    )
-    parser.add_argument(
-        "-L",
-        "--line-height",
-        type=float,
-        default=1.15,
-        help="Letter separation. Both in rows and columns",
-    )
-    parser.add_argument(
-        "-F",
-        "--foreground-color",
-        type=hex_string,
-        default="#111",
-        help="Foreground color",
-    )
-    parser.add_argument(
-        "-B",
-        "--background-color",
-        type=hex_string,
-        default="#fff",
-        help="Background color",
-    )
-    parser.add_argument(
-        "-G",
-        "--highlight-color",
-        type=hex_string,
-        default=["#e11"],
-        nargs="+",
-        help="Highlight colors",
-    )
-    parser.add_argument(
-        "-t",
-        "--highlight-text",
-        type=str,
-        default=[],
-        nargs="*",
-        help="Highlight words",
-    )
-    parser.add_argument(
-        "-c",
-        "--color",
-        action="store_true",
-        help="Colored output",
-    )
-    parser.add_argument(
-        "--color-palette",
-        type=int,
-        default=5,
-        help="Number of colors for --colors",
-    )
-    parser.add_argument(
-        "--color-offset",
-        type=float,
-        nargs=3,
-        default=[0, 0, 0],
-        help="Offsete for colors in HSV",
-    )
-    parser.add_argument(
-        "-H",
-        "--write-header",
-        action="store_true",
-        help="Writes header in the document",
-    )
-    parser.add_argument(
-        "-P",
-        "--paper-size",
-        choices=kee.PAPER_SIZES.keys(),
-        default="A3",
-        help="Print paper size",
-    )
-    parser.add_argument(
-        "-l",
-        "--landscape",
-        action="store_true",
-        help="Creates document in landscape orientation",
-    )
-    parser.add_argument(
-        "--translate-x",
-        type=float,
-        default=0,
-        help="Translates the image horizontally in em",
-    )
-    parser.add_argument(
-        "--translate-y",
-        type=float,
-        default=0,
-        help="Translates the image vertically in em",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        default=None,  # Same name as image
-        type=str,
-        help="Output image filename. Outputs to stdout if empty",
-    )
+
+    for subparser in [parser_cp, parser_t]:  #  Common arguments
+        subparser.add_argument("image", help="source image file")
+        subparser.add_argument(
+            "-w", "--width", type=int, default=360, help="Number of characters per row"
+        )
+        subparser.add_argument(
+            "-f",
+            "--font-size",
+            type=float,
+            default=12,
+            help="Font size",
+        )
+        subparser.add_argument(
+            "-F",
+            "--font-family",
+            type=str,
+            default="Courier",
+            help="Font family",
+        )
+        subparser.add_argument(
+            "-K",
+            "--black-threshold",
+            type=float,
+            default=0,
+            help="Image threshold for black",
+        )
+        subparser.add_argument(
+            "-W",
+            "--white-threshold",
+            type=float,
+            default=1,
+            help="Image threshold for white",
+        )
+        subparser.add_argument(
+            "-S",
+            "--letter-spacing",
+            type=float,
+            default=0.0,
+            help="Letter separation. Both in rows and columns",
+        )
+        subparser.add_argument(
+            "-L",
+            "--line-height",
+            type=float,
+            default=1.15,
+            help="Letter separation. Both in rows and columns",
+        )
+        subparser.add_argument(
+            "-C",
+            "--color",
+            type=hex_string,
+            default="#111",
+            help="Foreground color",
+        )
+        subparser.add_argument(
+            "-B",
+            "--background-color",
+            type=hex_string,
+            default="#fff",
+            help="Background color",
+        )
+        subparser.add_argument(
+            "-G",
+            "--highlight-color",
+            type=hex_string,
+            default=["#e11"],
+            nargs="+",
+            help="Highlight colors",
+        )
+        subparser.add_argument(
+            "-T",
+            "--highlight-text",
+            type=str,
+            default=[],
+            nargs="*",
+            help="Highlight words",
+        )
+        subparser.add_argument(
+            "-c",
+            "--colors",
+            action="store_true",
+            help="Colored output",
+        )
+
+        subparser.add_argument(
+            "--colors-palette",
+            type=int,
+            default=5,
+            help="Number of colors for --colors",
+        )
+        subparser.add_argument(
+            "--hsv-offset",
+            type=float,
+            nargs=3,
+            default=(0, 0, 0),
+            help="Offsete for colors in HSV",
+        )
+        subparser.add_argument(
+            "-H",
+            "--write-header",
+            action="store_true",
+            help="Writes header in the document",
+        )
+        subparser.add_argument(
+            "-P",
+            "--paper-size",
+            choices=kee.Kee.portrait_sizes.keys(),
+            default="A3",
+            help="Print paper size",
+        )
+        subparser.add_argument(
+            "-l",
+            "--landscape",
+            action="store_true",
+            help="Creates document in landscape orientation",
+        )
+        subparser.add_argument(
+            "--translate-x",
+            type=float,
+            default=0,
+            help="Translates the image horizontally in em",
+        )
+        subparser.add_argument(
+            "--translate-y",
+            type=float,
+            default=0,
+            help="Translates the image vertically in em",
+        )
+        subparser.add_argument(
+            "-o",
+            "--output",
+            default=None,  # Same name as image
+            type=str,
+            help="Output image filename. Outputs to stdout if empty",
+        )
+
+    parser_t.add_argument("text", help="source text file")
     parser.add_argument(
         "-v", "--version", action="version", version=f"%(prog)s {kee.__version__}"
     )
     parser.add_argument("-V", "--verbose", action="store_true")
     args = parser.parse_args()
 
-    main(
-        args.image,
-        args.width,
-        args.palette,
-        args.invert_palette,
-        args.font_size,
-        args.black_threshold,
-        args.white_threshold,
-        args.letter_spacing,
-        args.line_height,
-        args.foreground_color,
-        args.background_color,
-        args.highlight_color,
-        args.highlight_text,
-        args.color,
-        args.color_palette,
-        args.color_offset,
-        args.write_header,
-        args.paper_size,
-        args.landscape,
-        args.translate_x,
-        args.translate_y,
-        args.output,
-    )
+    main(args)
