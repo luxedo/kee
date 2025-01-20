@@ -15,6 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 import tempfile
 from os import path
 from subprocess import run
@@ -50,16 +51,20 @@ class TerminalRender(Render):
 
         layer_colors = [layer.color for layer in layers.layers]
         layer_colors = [
-            self.terminal_color.format(red=lc[0], green=lc[1], blue=lc[2])
-            if lc is not None
-            else self.terminal_default_color
+            (
+                self.terminal_color.format(red=lc[0], green=lc[1], blue=lc[2])
+                if lc is not None
+                else self.terminal_default_color
+            )
             for lc in layer_colors
         ]
         layer_bg_colors = [layer.background_color for layer in layers.layers]
         layer_bg_colors = [
-            self.terminal_bg_color.format(red=lc[0], green=lc[1], blue=lc[2])
-            if lc is not None
-            else self.terminal_default_bg_color
+            (
+                self.terminal_bg_color.format(red=lc[0], green=lc[1], blue=lc[2])
+                if lc is not None
+                else self.terminal_default_bg_color
+            )
             for lc in layer_bg_colors
         ]
 
